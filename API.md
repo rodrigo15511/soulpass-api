@@ -2,7 +2,9 @@
 
 API REST em Java (Spring Boot) que o Front consome.
 
-- **URL base (por enquanto):** `http://localhost:8080`. Depois do deploy, troca para a URL do Render; deixem isso numa constante, ex. `const API_URL = "..."`.
+- **URL base (produção, Render):** `https://soulpass-api-l23x.onrender.com`. Deixem numa constante, ex. `const API_URL = "https://soulpass-api-l23x.onrender.com"`.
+- **Rodando local:** `http://localhost:8080`.
+- O plano grátis do Render "dorme" após ~15 min sem uso: a **primeira** requisição pode levar até ~50 s. Mostrem um loading.
 - **Formato:** tudo em JSON. Mandem o header `Content-Type: application/json` no POST e no PUT.
 - **Datas** vêm como texto `"2026-10-28"` (AAAA-MM-DD).
 - **CORS** já está liberado, então o React pode chamar a API direto com `fetch`.
@@ -223,7 +225,7 @@ POST /resgates
 // src/services/missaoService.ts
 import type { Missao, ErroApi } from "../types";
 
-const API_URL = "http://localhost:8080";
+const API_URL = "https://soulpass-api-l23x.onrender.com";
 
 export async function listarMissoesAtivas(): Promise<Missao[]> {
   const resposta = await fetch(`${API_URL}/missoes/ativas`);
