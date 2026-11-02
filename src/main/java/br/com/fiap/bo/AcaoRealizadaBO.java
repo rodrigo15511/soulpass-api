@@ -2,20 +2,24 @@ package br.com.fiap.bo;
 
 import br.com.fiap.dao.AcaoRealizadaDao;
 import br.com.fiap.dao.MissaoDao;
+import br.com.fiap.dao.NivelDao;
 import br.com.fiap.dao.UsuarioDao;
 import br.com.fiap.entities.AcaoRealizada;
 import br.com.fiap.entities.Missao;
+import br.com.fiap.entities.Nivel;
 import br.com.fiap.entities.Usuario;
 
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Regras de negocio da Acao Realizada - o coracao do SoulPass.
  *
  * Fluxo: o usuario registra a acao (PENDENTE) -> informa o codigo do ponto parceiro
- * -> codigo certo: APROVADO e os pontos da missao vao para o usuario
+ * -> codigo certo: APROVADO, os pontos da missao vao para o usuario
+ *    e, se o XP alcancar o proximo nivel, ele sobe de nivel automaticamente
  * -> codigo errado: REJEITADO e nenhum ponto e creditado.
  */
 public class AcaoRealizadaBO {
@@ -131,6 +135,11 @@ public class AcaoRealizadaBO {
                 Usuario usuario = usuarioDao.buscarPorId(acao.getIdUsuario());
                 usuario.creditarPontos(acao.getPontosConquistados(), missao.getTituloMissao());
                 usuarioDao.atualizarPontos(usuario.getIdUsuario(), usuario.getSaldoPontos(), usuario.getPontosXp());
+
+                // com o XP novo, confere se o usuario alcancou um nivel acima
+                if (promoverNivel(usuario, carregarNiveis())) {
+                    usuarioDao.atualizarNivel(usuario.getIdUsuario(), usuario.getNivel().getIdNivel());
+                }
             }
 
             return acaoDao.buscarPorId(idAcao);
@@ -138,6 +147,28 @@ public class AcaoRealizadaBO {
             acaoDao.fecharConexao();
             usuarioDao.fecharConexao();
             missaoDao.fecharConexao();
+        }
+    }
+
+    // promoverNivel - percorre os niveis do menor para o maior; subiuDeNivel (Sprint 3) so troca
+    // quando o XP alcanca o nivel e ele e maior que o atual. Retorna true se o nivel mudou.
+    static boolean promoverNivel(Usuario usuario, List<Nivel> niveisEmOrdem) {
+        boolean subiu = false;
+        for (Nivel nivel : niveisEmOrdem) {
+            if (usuario.subiuDeNivel(nivel)) {
+                subiu = true;
+            }
+        }
+        return subiu;
+    }
+
+    // carregarNiveis - le TB_NIVEL em ordem (NIVEL_ORDEM)
+    private ArrayList<Nivel> carregarNiveis() throws SQLException, ClassNotFoundException {
+        NivelDao nivelDao = new NivelDao();
+        try {
+            return nivelDao.selecionar();
+        } finally {
+            nivelDao.fecharConexao();
         }
     }
 
