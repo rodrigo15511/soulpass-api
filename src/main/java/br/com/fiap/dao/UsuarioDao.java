@@ -19,6 +19,13 @@ public class UsuarioDao {
 
     public Connection minhaConexao;
 
+    // colunas comuns a todos os selects (traz o nivel junto)
+    private static final String SELECT_USUARIO =
+            "Select U.ID_USUARIO, U.NOME, U.CPF, U.EMAIL, U.SENHA, U.SALDO_PONTOS, U.PONTOS_XP, "
+                    + "U.DATA_CADASTRO, U.ATIVO, N.ID_NIVEL, N.NOME_NIVEL, N.NIVEL_ORDEM, "
+                    + "N.PONTOS_XP_NECESSARIOS, N.DESCRICAO "
+                    + "From TB_USUARIO U Inner Join TB_NIVEL N On U.ID_NIVEL = N.ID_NIVEL ";
+
     public UsuarioDao() throws SQLException, ClassNotFoundException {
         this.minhaConexao = new ConexaoFactory().conexao();
     }
@@ -34,7 +41,7 @@ public class UsuarioDao {
     public String inserir(Usuario usuario) throws SQLException {
         PreparedStatement stmt = minhaConexao.prepareStatement(
                 "Insert Into TB_USUARIO (ID_USUARIO, NOME, CPF, EMAIL, SALDO_PONTOS, "
-                        + "PONTOS_XP, ID_NIVEL, DATA_CADASTRO, ATIVO) values (?,?,?,?,?,?,?,?,?)");
+                        + "PONTOS_XP, ID_NIVEL, DATA_CADASTRO, ATIVO, SENHA) values (?,?,?,?,?,?,?,?,?,?)");
 
         stmt.setInt(1, usuario.getIdUsuario());
         stmt.setString(2, usuario.getNome());
@@ -45,6 +52,7 @@ public class UsuarioDao {
         stmt.setInt(7, usuario.getNivel().getIdNivel());
         stmt.setDate(8, Date.valueOf(usuario.getDataCadastro()));
         stmt.setString(9, usuario.isAtivo() ? "S" : "N");
+        stmt.setString(10, usuario.getSenha());
 
         stmt.execute();
         stmt.close();
@@ -68,7 +76,7 @@ public class UsuarioDao {
     public String atualizar(Usuario usuario) throws SQLException {
         PreparedStatement stmt = minhaConexao.prepareStatement(
                 "Update TB_USUARIO set NOME =?, CPF =?, EMAIL =?, SALDO_PONTOS =?, "
-                        + "PONTOS_XP =?, ID_NIVEL =?, ATIVO =? where ID_USUARIO =?");
+                        + "PONTOS_XP =?, ID_NIVEL =?, ATIVO =?, SENHA =? where ID_USUARIO =?");
 
         stmt.setString(1, usuario.getNome());
         stmt.setString(2, usuario.getCpf());
@@ -77,7 +85,8 @@ public class UsuarioDao {
         stmt.setDouble(5, usuario.getPontosXp());
         stmt.setInt(6, usuario.getNivel().getIdNivel());
         stmt.setString(7, usuario.isAtivo() ? "S" : "N");
-        stmt.setInt(8, usuario.getIdUsuario());
+        stmt.setString(8, usuario.getSenha());
+        stmt.setInt(9, usuario.getIdUsuario());
 
         stmt.executeUpdate();
         stmt.close();
@@ -90,11 +99,7 @@ public class UsuarioDao {
         ArrayList<Usuario> listaUsuario = new ArrayList<Usuario>();
 
         PreparedStatement stmt = minhaConexao.prepareStatement(
-                "Select U.ID_USUARIO, U.NOME, U.CPF, U.EMAIL, U.SALDO_PONTOS, U.PONTOS_XP, "
-                        + "U.DATA_CADASTRO, U.ATIVO, N.ID_NIVEL, N.NOME_NIVEL, N.NIVEL_ORDEM, "
-                        + "N.PONTOS_XP_NECESSARIOS, N.DESCRICAO "
-                        + "From TB_USUARIO U Inner Join TB_NIVEL N On U.ID_NIVEL = N.ID_NIVEL "
-                        + "Order By U.ID_USUARIO");
+                SELECT_USUARIO + "Order By U.ID_USUARIO");
 
         ResultSet rs = stmt.executeQuery();
 
@@ -113,12 +118,28 @@ public class UsuarioDao {
         Usuario usuario = null;
 
         PreparedStatement stmt = minhaConexao.prepareStatement(
-                "Select U.ID_USUARIO, U.NOME, U.CPF, U.EMAIL, U.SALDO_PONTOS, U.PONTOS_XP, "
-                        + "U.DATA_CADASTRO, U.ATIVO, N.ID_NIVEL, N.NOME_NIVEL, N.NIVEL_ORDEM, "
-                        + "N.PONTOS_XP_NECESSARIOS, N.DESCRICAO "
-                        + "From TB_USUARIO U Inner Join TB_NIVEL N On U.ID_NIVEL = N.ID_NIVEL "
-                        + "Where U.ID_USUARIO =?");
+                SELECT_USUARIO + "Where U.ID_USUARIO =?");
         stmt.setInt(1, idUsuario);
+
+        ResultSet rs = stmt.executeQuery();
+
+        if (rs.next()) {
+            usuario = montarUsuario(rs);
+        }
+
+        rs.close();
+        stmt.close();
+
+        return usuario;
+    }
+
+    // Selecionar -> buscarPorEmail (usado no login; EMAIL e UNIQUE, sem diferenciar maiusculas)
+    public Usuario buscarPorEmail(String email) throws SQLException {
+        Usuario usuario = null;
+
+        PreparedStatement stmt = minhaConexao.prepareStatement(
+                SELECT_USUARIO + "Where Lower(U.EMAIL) = Lower(?)");
+        stmt.setString(1, email.trim());
 
         ResultSet rs = stmt.executeQuery();
 
@@ -195,6 +216,7 @@ public class UsuarioDao {
         usuario.setNome(rs.getString("NOME"));
         usuario.setCpf(rs.getString("CPF"));
         usuario.setEmail(rs.getString("EMAIL"));
+        usuario.setSenha(rs.getString("SENHA"));
         usuario.setSaldoPontos(rs.getDouble("SALDO_PONTOS"));
         usuario.setPontosXp(rs.getDouble("PONTOS_XP"));
         usuario.setDataCadastro(rs.getDate("DATA_CADASTRO").toLocalDate());

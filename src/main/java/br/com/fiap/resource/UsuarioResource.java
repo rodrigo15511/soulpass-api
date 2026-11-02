@@ -19,18 +19,36 @@ import java.util.Map;
 /**
  * Endpoints REST de Usuario - base: /usuarios
  *
- * GET    /usuarios       -> lista todos           (200)
- * GET    /usuarios/{id}  -> busca um              (200 / 404)
- * POST   /usuarios       -> cadastra              (201 / 400 / 409)
- * PUT    /usuarios/{id}  -> atualiza              (200 / 400 / 404 / 409)
- * DELETE /usuarios/{id}  -> exclui                (204 / 404 / 409)
- * Erro inesperado (ex.: banco fora do ar)         (500)
+ * GET    /usuarios        -> lista todos           (200)
+ * GET    /usuarios/{id}   -> busca um              (200 / 404)
+ * POST   /usuarios        -> cadastra              (201 / 400 / 409)
+ * POST   /usuarios/login  -> autentica             (200 / 400 / 401 / 403)
+ * PUT    /usuarios/{id}   -> atualiza              (200 / 400 / 404 / 409)
+ * DELETE /usuarios/{id}   -> exclui                (204 / 404 / 409)
+ * Erro inesperado (ex.: banco fora do ar)          (500)
+ * A senha nunca aparece nas respostas (WRITE_ONLY na entidade).
  */
 @RestController
 @RequestMapping("/usuarios")
 public class UsuarioResource {
 
     private final UsuarioBO usuarioBO = new UsuarioBO();
+
+    // Corpo esperado: { "email": "maria@email.com", "senha": "123456" }
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> corpo) {
+        try {
+            Usuario usuario = usuarioBO.autenticarBo(corpo.get("email"), corpo.get("senha"));
+            if (usuario == null) {
+                return mensagem(HttpStatus.UNAUTHORIZED, "E-mail ou senha invalidos.");
+            }
+            return ResponseEntity.ok(usuario);
+        } catch (IllegalStateException e) {
+            return mensagem(HttpStatus.FORBIDDEN, e.getMessage());
+        } catch (Exception e) {
+            return erro(e);
+        }
+    }
 
     @GetMapping
     public ResponseEntity<?> listar() {

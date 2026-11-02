@@ -45,8 +45,9 @@ export interface Nivel {
 export interface Usuario {
   idUsuario: number;
   nome: string;
-  cpf: string;
+  cpf: string | null;    // opcional
   email: string;
+  // a senha NUNCA vem nas respostas da API
   saldoPontos: number;   // pontos que podem ser gastos (diminui no resgate)
   pontosXp: number;      // total historico (nunca diminui, define o nivel)
   nivel: Nivel;
@@ -116,17 +117,25 @@ export interface ErroApi {
 |---|---|---|---|
 | GET | `/usuarios` | – | 200 `Usuario[]` |
 | GET | `/usuarios/{id}` | – | 200 `Usuario` · 404 |
-| POST | `/usuarios` | `{ nome, cpf, email }` | 201 `Usuario` · 400 · 409 (CPF/e-mail já existe) |
-| PUT | `/usuarios/{id}` | `{ nome, cpf, email, ativo }` | 200 `Usuario` · 400 · 404 · 409 |
+| POST | `/usuarios` | `{ nome, email, senha, cpf? }` | 201 `Usuario` · 400 · 409 (CPF/e-mail já existe) |
+| POST | `/usuarios/login` | `{ email, senha }` | 200 `Usuario` · 400 (faltou campo) · 401 (e-mail ou senha errados) · 403 (usuário inativo) |
+| PUT | `/usuarios/{id}` | `{ nome, email, ativo, cpf?, senha? }` | 200 `Usuario` · 400 · 404 · 409 |
 | DELETE | `/usuarios/{id}` | – | 204 · 404 · 409 (tem ações/resgates ligados) |
 
 - No cadastro, a API define sozinha: id, 0 pontos, nível 1 (Iniciante) e a data.
-- O PUT **não altera pontos nem nível**. Eles só mudam aprovando ações ou resgatando vouchers.
-- Validações: nome com pelo menos 3 letras, CPF com 11 dígitos (com ou sem máscara) e e-mail válido.
+- **Senha:** obrigatória no cadastro, com pelo menos 6 caracteres. É guardada criptografada (BCrypt) e **nunca** volta nas respostas.
+- **CPF:** opcional. Se vier preenchido, precisa ter 11 dígitos (com ou sem máscara).
+- O PUT **não altera pontos nem nível**. Eles só mudam aprovando ações ou resgatando vouchers. Se `senha` vier vazia ou não vier, a senha atual é mantida.
+- Validações: nome com pelo menos 3 letras e e-mail válido.
+
+**Login:** o `POST /usuarios/login` devolve o usuário completo (com `idUsuario`, saldo, XP e nível). Guardem esse objeto (ex.: `useContext` + `localStorage`) para saber quem está logado. Não há token: a API devolve os dados e o Front controla a sessão.
 
 ```json
 POST /usuarios
-{ "nome": "Maria Silva", "cpf": "123.456.789-00", "email": "maria@email.com" }
+{ "nome": "Maria Silva", "email": "maria@email.com", "senha": "minhaSenha123" }
+
+POST /usuarios/login
+{ "email": "maria@email.com", "senha": "minhaSenha123" }
 ```
 
 ## Missões – `/missoes`

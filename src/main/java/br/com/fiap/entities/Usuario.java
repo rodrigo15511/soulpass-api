@@ -1,15 +1,22 @@
 package br.com.fiap.entities;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDate;
 
 /**
  * Mapeia TB_USUARIO.
  * saldo_pontos  -> moeda gastavel (diminui no resgate)
  * pontos_xp     -> acumulado historico (nunca diminui, define o nivel)
+ * senha         -> hash BCrypt; a API recebe no JSON, mas nunca devolve
  */
 public class Usuario extends Pessoa {
 
     private int idUsuario;
+
+    // WRITE_ONLY: entra no POST/PUT, mas nao aparece nas respostas da API
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String senha;
     private double saldoPontos;
     private double pontosXp;
     private Nivel nivel;
@@ -38,6 +45,14 @@ public class Usuario extends Pessoa {
 
     public void setIdUsuario(int idUsuario) {
         this.idUsuario = idUsuario;
+    }
+
+    public String getSenha() {
+        return senha;
+    }
+
+    public void setSenha(String senha) {
+        this.senha = senha;
     }
 
     public double getSaldoPontos() {
