@@ -1,5 +1,6 @@
 package br.com.fiap.bo;
 
+import br.com.fiap.conexoes.ConexaoFactory;
 import br.com.fiap.dao.AcaoRealizadaDao;
 import br.com.fiap.dao.MissaoDao;
 import br.com.fiap.dao.NivelDao;
@@ -9,6 +10,7 @@ import br.com.fiap.entities.Missao;
 import br.com.fiap.entities.Nivel;
 import br.com.fiap.entities.Usuario;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -105,11 +107,15 @@ public class AcaoRealizadaBO {
         }
     }
 
-    // Aprovar - confere o codigo; se correto grava APROVADO e credita os pontos ao usuario
+    // Aprovar - confere o codigo; se correto grava APROVADO e credita os pontos ao usuario.
+    // Tudo numa TRANSACAO: status da acao, pontos e nivel sao gravados juntos ou nada e gravado.
     public AcaoRealizada aprovarBo(int idAcao, String codigoInformado) throws SQLException, ClassNotFoundException {
-        AcaoRealizadaDao acaoDao = new AcaoRealizadaDao();
-        UsuarioDao usuarioDao = new UsuarioDao();
-        MissaoDao missaoDao = new MissaoDao();
+        Connection conexao = new ConexaoFactory().conexao();
+        conexao.setAutoCommit(false);
+
+        AcaoRealizadaDao acaoDao = new AcaoRealizadaDao(conexao);
+        UsuarioDao usuarioDao = new UsuarioDao(conexao);
+        MissaoDao missaoDao = new MissaoDao(conexao);
         try {
             AcaoRealizada acao = acaoDao.buscarPorId(idAcao);
             if (acao == null) {
@@ -137,16 +143,18 @@ public class AcaoRealizadaBO {
                 usuarioDao.atualizarPontos(usuario.getIdUsuario(), usuario.getSaldoPontos(), usuario.getPontosXp());
 
                 // com o XP novo, confere se o usuario alcancou um nivel acima
-                if (promoverNivel(usuario, carregarNiveis())) {
+                if (promoverNivel(usuario, new NivelDao(conexao).selecionar())) {
                     usuarioDao.atualizarNivel(usuario.getIdUsuario(), usuario.getNivel().getIdNivel());
                 }
             }
 
+            conexao.commit();   // deu tudo certo: grava as alteracoes de uma vez
             return acaoDao.buscarPorId(idAcao);
+        } catch (Exception e) {
+            conexao.rollback(); // algo falhou no meio: desfaz tudo o que foi feito nesta transacao
+            throw e;
         } finally {
-            acaoDao.fecharConexao();
-            usuarioDao.fecharConexao();
-            missaoDao.fecharConexao();
+            conexao.close();
         }
     }
 
@@ -160,16 +168,6 @@ public class AcaoRealizadaBO {
             }
         }
         return subiu;
-    }
-
-    // carregarNiveis - le TB_NIVEL em ordem (NIVEL_ORDEM)
-    private ArrayList<Nivel> carregarNiveis() throws SQLException, ClassNotFoundException {
-        NivelDao nivelDao = new NivelDao();
-        try {
-            return nivelDao.selecionar();
-        } finally {
-            nivelDao.fecharConexao();
-        }
     }
 
     // Rejeitar - recusa manual de uma acao pendente

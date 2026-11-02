@@ -21,6 +21,11 @@ public class NivelDao {
         this.minhaConexao = new ConexaoFactory().conexao();
     }
 
+    // Construtor para transacao: usa a conexao aberta pelo BO (o BO faz commit/rollback e fecha)
+    public NivelDao(Connection conexao) {
+        this.minhaConexao = conexao;
+    }
+
     // Fechar a conexao - chamado pelo BO ao final de cada requisicao da API
     public void fecharConexao() throws SQLException {
         if (minhaConexao != null && !minhaConexao.isClosed()) {

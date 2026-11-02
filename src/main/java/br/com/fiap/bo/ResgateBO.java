@@ -1,5 +1,6 @@
 package br.com.fiap.bo;
 
+import br.com.fiap.conexoes.ConexaoFactory;
 import br.com.fiap.dao.ResgateDao;
 import br.com.fiap.dao.UsuarioDao;
 import br.com.fiap.dao.VoucherDao;
@@ -7,6 +8,7 @@ import br.com.fiap.entities.Resgate;
 import br.com.fiap.entities.Usuario;
 import br.com.fiap.entities.Voucher;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -60,11 +62,15 @@ public class ResgateBO {
         }
     }
 
-    // Resgatar - confere o saldo, debita os pontos e gera o voucher do usuario
+    // Resgatar - confere o saldo, debita os pontos e gera o voucher do usuario.
+    // TRANSACAO: o debito do saldo e o registro do resgate sao gravados juntos ou nenhum dos dois.
     public Resgate resgatarBo(int idUsuario, int idVoucher) throws SQLException, ClassNotFoundException {
-        ResgateDao resgateDao = new ResgateDao();
-        UsuarioDao usuarioDao = new UsuarioDao();
-        VoucherDao voucherDao = new VoucherDao();
+        Connection conexao = new ConexaoFactory().conexao();
+        conexao.setAutoCommit(false);
+
+        ResgateDao resgateDao = new ResgateDao(conexao);
+        UsuarioDao usuarioDao = new UsuarioDao(conexao);
+        VoucherDao voucherDao = new VoucherDao(conexao);
         try {
             Usuario usuario = usuarioDao.buscarPorId(idUsuario);
             if (usuario == null) {
@@ -98,11 +104,14 @@ public class ResgateBO {
             resgate.setStatusVoucher(Resgate.STATUS_DISPONIVEL);
 
             resgateDao.inserir(resgate);
+
+            conexao.commit();   // saldo debitado + resgate gravado, juntos
             return resgateDao.buscarPorId(resgate.getIdResgate());
+        } catch (Exception e) {
+            conexao.rollback(); // falhou no meio: o saldo volta ao que era
+            throw e;
         } finally {
-            resgateDao.fecharConexao();
-            usuarioDao.fecharConexao();
-            voucherDao.fecharConexao();
+            conexao.close();
         }
     }
 
@@ -142,11 +151,15 @@ public class ResgateBO {
         }
     }
 
-    // Cancelar - so resgates DISPONIVEIS; os pontos voltam para o saldo do usuario
+    // Cancelar - so resgates DISPONIVEIS; os pontos voltam para o saldo do usuario.
+    // TRANSACAO: a devolucao dos pontos e a exclusao do resgate acontecem juntas.
     public boolean cancelarBo(int idResgate) throws SQLException, ClassNotFoundException {
-        ResgateDao resgateDao = new ResgateDao();
-        UsuarioDao usuarioDao = new UsuarioDao();
-        VoucherDao voucherDao = new VoucherDao();
+        Connection conexao = new ConexaoFactory().conexao();
+        conexao.setAutoCommit(false);
+
+        ResgateDao resgateDao = new ResgateDao(conexao);
+        UsuarioDao usuarioDao = new UsuarioDao(conexao);
+        VoucherDao voucherDao = new VoucherDao(conexao);
         try {
             Resgate resgate = resgateDao.buscarPorId(idResgate);
             if (resgate == null) {
@@ -163,11 +176,14 @@ public class ResgateBO {
             usuarioDao.atualizarPontos(usuario.getIdUsuario(),
                     usuario.getSaldoPontos() + voucher.getCustoPontos(), usuario.getPontosXp());
             resgateDao.deletar(idResgate);
+
+            conexao.commit();
             return true;
+        } catch (Exception e) {
+            conexao.rollback();
+            throw e;
         } finally {
-            resgateDao.fecharConexao();
-            usuarioDao.fecharConexao();
-            voucherDao.fecharConexao();
+            conexao.close();
         }
     }
 }
