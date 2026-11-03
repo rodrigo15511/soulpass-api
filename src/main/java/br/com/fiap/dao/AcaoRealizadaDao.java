@@ -209,6 +209,23 @@ public class AcaoRealizadaDao {
         return total;
     }
 
+    // Gravar o resultado da validacao SO se a acao ainda estiver PENDENTE.
+    // Retorna quantas linhas mudaram: 0 = outra requisicao ja processou esta acao (evita aprovar 2x)
+    public int atualizarStatusSePendente(int idAcao, String status, double pontos) throws SQLException {
+        PreparedStatement stmt = minhaConexao.prepareStatement(
+                "Update TB_ACAO_REALIZADA set STATUS_APROVACAO =?, PONTOS_CONQUISTADOS =? "
+                        + "where ID_ACAO =? And STATUS_APROVACAO ='PENDENTE'");
+
+        stmt.setString(1, status.toUpperCase());
+        stmt.setDouble(2, pontos);
+        stmt.setInt(3, idAcao);
+
+        int linhas = stmt.executeUpdate();
+        stmt.close();
+
+        return linhas;
+    }
+
     // Proximo ID disponivel
     public int proximoId() throws SQLException {
         int proximo = 1;

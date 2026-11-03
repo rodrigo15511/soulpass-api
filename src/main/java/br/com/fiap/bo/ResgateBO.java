@@ -90,9 +90,11 @@ public class ResgateBO {
                         + " | custo do voucher: " + voucher.getCustoPontos() + " pontos.");
             }
 
-            // debitarPontos (Sprint 3) tira so do saldo - o XP e o nivel continuam iguais
-            usuario.debitarPontos(voucher.getCustoPontos(), "Resgate voucher " + voucher.getTipoTransporte());
-            usuarioDao.atualizarPontos(idUsuario, usuario.getSaldoPontos(), usuario.getPontosXp());
+            // debita so o saldo (o XP e o nivel continuam iguais). A checagem do saldo e repetida
+            // no proprio UPDATE: se outro resgate gastou os pontos nesse meio tempo, nao debita
+            if (!usuarioDao.debitarSaldo(idUsuario, voucher.getCustoPontos())) {
+                throw new IllegalStateException("Saldo insuficiente para este voucher.");
+            }
 
             Resgate resgate = new Resgate();
             resgate.setIdResgate(resgateDao.proximoId());
@@ -129,10 +131,15 @@ public class ResgateBO {
 
             // utilizar (Sprint 3) decide entre UTILIZADO e EXPIRADO conforme a validade
             String resultado = resgate.utilizar();
-            resgateDao.atualizar(resgate);
 
             if (Resgate.STATUS_EXPIRADO.equalsIgnoreCase(resgate.getStatusVoucher())) {
+                resgateDao.atualizar(resgate);   // grava o EXPIRADO
                 throw new IllegalStateException(resultado);
+            }
+
+            // so marca como usado se ainda estiver DISPONIVEL: o mesmo voucher nao e usado 2x
+            if (resgateDao.utilizarSeDisponivel(resgate.getIdResgate()) == 0) {
+                throw new IllegalStateException("Este voucher ja foi utilizado.");
             }
 
             return resgateDao.buscarPorId(resgate.getIdResgate());
@@ -169,13 +176,14 @@ public class ResgateBO {
                 throw new IllegalStateException("So e possivel cancelar vouchers DISPONIVEIS e dentro da validade.");
             }
 
-            Voucher voucher = voucherDao.buscarPorId(resgate.getIdVoucher());
-            Usuario usuario = usuarioDao.buscarPorId(resgate.getIdUsuario());
+            // exclui primeiro, e so se ainda estiver DISPONIVEL: dois cancelamentos nao devolvem pontos 2x
+            if (resgateDao.deletarSeDisponivel(idResgate) == 0) {
+                throw new IllegalStateException("Este resgate ja foi utilizado ou cancelado.");
+            }
 
-            // devolve so o saldo - o XP nao foi alterado no resgate
-            usuarioDao.atualizarPontos(usuario.getIdUsuario(),
-                    usuario.getSaldoPontos() + voucher.getCustoPontos(), usuario.getPontosXp());
-            resgateDao.deletar(idResgate);
+            // devolve so o saldo (o XP nao foi alterado no resgate), somando pelo Oracle
+            Voucher voucher = voucherDao.buscarPorId(resgate.getIdVoucher());
+            usuarioDao.somarPontos(resgate.getIdUsuario(), voucher.getCustoPontos(), 0);
 
             conexao.commit();
             return true;

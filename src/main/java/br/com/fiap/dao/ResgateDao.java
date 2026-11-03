@@ -203,6 +203,31 @@ public class ResgateDao {
         return linhas + " voucher(s) marcado(s) como EXPIRADO.";
     }
 
+    // Marcar como UTILIZADO so se ainda estiver DISPONIVEL - 0 linhas = ja foi usado por outra requisicao
+    public int utilizarSeDisponivel(int idResgate) throws SQLException {
+        PreparedStatement stmt = minhaConexao.prepareStatement(
+                "Update TB_RESGATE set STATUS_VOUCHER ='UTILIZADO' "
+                        + "Where ID_RESGATE =? And STATUS_VOUCHER ='DISPONIVEL'");
+        stmt.setInt(1, idResgate);
+
+        int linhas = stmt.executeUpdate();
+        stmt.close();
+
+        return linhas;
+    }
+
+    // Excluir so se ainda estiver DISPONIVEL - 0 linhas = ja foi usado ou cancelado
+    public int deletarSeDisponivel(int idResgate) throws SQLException {
+        PreparedStatement stmt = minhaConexao.prepareStatement(
+                "Delete From TB_RESGATE Where ID_RESGATE =? And STATUS_VOUCHER ='DISPONIVEL'");
+        stmt.setInt(1, idResgate);
+
+        int linhas = stmt.executeUpdate();
+        stmt.close();
+
+        return linhas;
+    }
+
     // Proximo ID disponivel
     public int proximoId() throws SQLException {
         int proximo = 1;

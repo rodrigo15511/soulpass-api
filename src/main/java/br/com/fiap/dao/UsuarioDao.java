@@ -188,6 +188,38 @@ public class UsuarioDao {
         return "Nivel Atualizado com Sucesso!!!";
     }
 
+    // Somar pontos de forma atomica: a conta e feita pelo Oracle (SALDO + ?), nao com um valor
+    // lido antes - duas aprovacoes ao mesmo tempo nao "apagam" uma a outra
+    public void somarPontos(int idUsuario, double saldo, double xp) throws SQLException {
+        PreparedStatement stmt = minhaConexao.prepareStatement(
+                "Update TB_USUARIO set SALDO_PONTOS = SALDO_PONTOS + ?, PONTOS_XP = PONTOS_XP + ? "
+                        + "where ID_USUARIO =?");
+
+        stmt.setDouble(1, saldo);
+        stmt.setDouble(2, xp);
+        stmt.setInt(3, idUsuario);
+
+        stmt.executeUpdate();
+        stmt.close();
+    }
+
+    // Debitar o saldo SO se ele cobrir o valor - retorna false se nao havia saldo suficiente.
+    // A checagem e o debito acontecem no mesmo comando: dois resgates simultaneos nao deixam o saldo negativo
+    public boolean debitarSaldo(int idUsuario, double valor) throws SQLException {
+        PreparedStatement stmt = minhaConexao.prepareStatement(
+                "Update TB_USUARIO set SALDO_PONTOS = SALDO_PONTOS - ? "
+                        + "where ID_USUARIO =? And SALDO_PONTOS >= ?");
+
+        stmt.setDouble(1, valor);
+        stmt.setInt(2, idUsuario);
+        stmt.setDouble(3, valor);
+
+        int linhas = stmt.executeUpdate();
+        stmt.close();
+
+        return linhas > 0;
+    }
+
     // Proximo ID disponivel - o modelo nao possui sequences
     public int proximoId() throws SQLException {
         int proximo = 1;

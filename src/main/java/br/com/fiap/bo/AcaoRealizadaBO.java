@@ -135,14 +135,18 @@ public class AcaoRealizadaBO {
 
             // a regra do codigo esta na entidade (Sprint 3): muda o status e calcula os pontos
             acao.aprovar(codigoInformado, missao);
-            acaoDao.atualizarStatus(idAcao, acao.getStatusAprovacao(), acao.getPontosConquistados());
+
+            // so grava se ainda estiver PENDENTE: dois cliques em "aprovar" nao geram pontos em dobro
+            if (acaoDao.atualizarStatusSePendente(idAcao, acao.getStatusAprovacao(), acao.getPontosConquistados()) == 0) {
+                throw new IllegalStateException("Esta acao ja foi processada por outra requisicao.");
+            }
 
             if (acao.foiAprovada()) {
-                Usuario usuario = usuarioDao.buscarPorId(acao.getIdUsuario());
-                usuario.creditarPontos(acao.getPontosConquistados(), missao.getTituloMissao());
-                usuarioDao.atualizarPontos(usuario.getIdUsuario(), usuario.getSaldoPontos(), usuario.getPontosXp());
+                // soma feita pelo Oracle (SALDO + pontos): nao se perde ponto com aprovacoes simultaneas
+                usuarioDao.somarPontos(acao.getIdUsuario(), acao.getPontosConquistados(), acao.getPontosConquistados());
 
-                // com o XP novo, confere se o usuario alcancou um nivel acima
+                // le o usuario ja com o XP novo e confere se ele alcancou um nivel acima
+                Usuario usuario = usuarioDao.buscarPorId(acao.getIdUsuario());
                 if (promoverNivel(usuario, new NivelDao(conexao).selecionar())) {
                     usuarioDao.atualizarNivel(usuario.getIdUsuario(), usuario.getNivel().getIdNivel());
                 }
@@ -183,7 +187,9 @@ public class AcaoRealizadaBO {
             }
 
             acao.rejeitar(motivo);
-            acaoDao.atualizarStatus(idAcao, acao.getStatusAprovacao(), acao.getPontosConquistados());
+            if (acaoDao.atualizarStatusSePendente(idAcao, acao.getStatusAprovacao(), acao.getPontosConquistados()) == 0) {
+                throw new IllegalStateException("Esta acao ja foi processada por outra requisicao.");
+            }
             return acaoDao.buscarPorId(idAcao);
         } finally {
             acaoDao.fecharConexao();
