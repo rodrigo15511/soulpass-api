@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.Map;
+
+import static br.com.fiap.resource.RespostaErro.erro;
+import static br.com.fiap.resource.RespostaErro.mensagem;
 
 /**
  * Endpoints REST de Usuario - base: /usuarios
@@ -105,22 +107,5 @@ public class UsuarioResource {
         } catch (Exception e) {
             return erro(e);
         }
-    }
-
-    // erro - converte a excecao no status HTTP adequado
-    private ResponseEntity<Map<String, String>> erro(Exception e) {
-        if (e instanceof IllegalArgumentException) {
-            return mensagem(HttpStatus.BAD_REQUEST, String.valueOf(e.getMessage()));
-        }
-        if (e instanceof SQLIntegrityConstraintViolationException) {
-            // CPF/e-mail repetido (UNIQUE) ou usuario com registros ligados (FK)
-            return mensagem(HttpStatus.CONFLICT, "Operacao viola uma regra do banco: " + e.getMessage());
-        }
-        e.printStackTrace();
-        return mensagem(HttpStatus.INTERNAL_SERVER_ERROR, "Erro interno: " + e.getMessage());
-    }
-
-    private ResponseEntity<Map<String, String>> mensagem(HttpStatus status, String texto) {
-        return ResponseEntity.status(status).body(Map.of("mensagem", texto));
     }
 }
